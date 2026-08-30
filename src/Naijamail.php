@@ -43,8 +43,18 @@ final class Naijamail
     /** Retries after the first attempt, so 2 means three attempts in total. */
     public const DEFAULT_MAX_RETRIES = 2;
 
-    /** The key must look like one before we spend an hour finding out it is not. */
-    private const KEY_PATTERN = '/^nmail_(live|test)_[A-Za-z0-9_-]{8,}$/';
+    /**
+     * The key must look like one before we spend an hour finding out it is not.
+     *
+     * Two families, because the API accepts two: `nmail_live_`/`nmail_test_` is
+     * a Naijamail-only key from the dashboard's Email screen, and `nc_live_` is
+     * a workspace API key carrying the Email send scope, from Settings -> API
+     * keys. It stays an allowlist rather than relaxing to "any non-empty
+     * string": the check exists to catch the truncated paste and the
+     * wrong-variable-name deploy, and a pattern that accepts anything catches
+     * neither.
+     */
+    private const KEY_PATTERN = '/^(?:nmail_(?:live|test)|nc_live)_[A-Za-z0-9_-]{8,}$/';
 
     /**
      * `transport` and `sleeper` are test seams, not configuration. They are
@@ -220,8 +230,8 @@ final class Naijamail
         if (preg_match(self::KEY_PATTERN, $key) !== 1) {
             throw new ValidationException(
                 'the API key is not shaped like a Naijamail key. It should look like'
-                . ' "nmail_live_..." or "nmail_test_...". Check for a copied newline or a'
-                . ' truncated value; the key itself is not shown here on purpose.',
+                . ' "nmail_live_...", "nmail_test_..." or "nc_live_...". Check for a copied'
+                . ' newline or a truncated value; the key itself is not shown here on purpose.',
             );
         }
 

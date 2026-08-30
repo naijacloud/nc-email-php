@@ -65,7 +65,12 @@ final class ClientConstructionTest extends TestCase
             'no environment' => ['nmail_0123456789abcdef'],
             'too short' => ['nmail_live_short'],
             'illegal characters' => ['nmail_live_has spaces in it'],
+            // The pre-scopes platform token. The API refuses it on the mail
+            // routes outright — it predates the Email send scope and was never
+            // granted mail access — so it fails here rather than at send time.
             'a platform token' => ['nc_pat_0123456789abcdef'],
+            // There is no test variant of a workspace key.
+            'a workspace test variant' => ['nc_test_0123456789abcdef'],
         ];
     }
 
@@ -85,6 +90,17 @@ final class ClientConstructionTest extends TestCase
         $client = new Naijamail("\n" . self::KEY . "\n");
 
         self::assertSame('nmail_live_***', $client->redactedApiKey());
+    }
+
+    /** A key from Settings -> API keys, carrying the Email send scope. */
+    public function testAWorkspaceApiKeyIsAccepted(): void
+    {
+        $client = new Naijamail('nc_live_0123456789abcdefghij');
+
+        // Redaction has to know the prefix too, or a workspace key falls
+        // through to a bare '***' and an operator loses the one useful signal
+        // in a dump: which kind of credential this process is holding.
+        self::assertSame('nc_live_***', $client->redactedApiKey());
     }
 
     public function testATestKeyIsAcceptedLocally(): void
