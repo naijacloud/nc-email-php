@@ -48,6 +48,16 @@ final class GetTest extends ServerTestCase
         self::assertSame(MessageStatus::DELIVERED, $email->status);
     }
 
+    /**
+     * A test-key message is never sent, so a "bounced" one is simulated.
+     * Without the flag it reads exactly like a real deliverability problem.
+     */
+    public function testTheSandboxFlagIsExposed(): void
+    {
+        self::assertTrue($this->client('sandbox-message')->emails->get(self::ID)->sandbox);
+        self::assertFalse($this->client()->emails->get(self::ID)->sandbox);
+    }
+
     public function testDeliveredAtIsNullUntilDelivery(): void
     {
         $email = $this->client('queued-message')->emails->get(self::ID);

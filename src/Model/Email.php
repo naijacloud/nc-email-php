@@ -31,6 +31,12 @@ final class Email
         public readonly bool $opened = false,
         public readonly bool $clicked = false,
         public readonly ?string $failureReason = null,
+        /**
+         * True for a message sent with a test key (`nmail_test_…`): recorded,
+         * never handed to a mail server, so a `bounced` sandbox message is a
+         * simulated outcome, not a deliverability problem.
+         */
+        public readonly bool $sandbox = false,
     ) {
     }
 
@@ -54,6 +60,7 @@ final class Email
             isset($data['failure_reason']) && is_scalar($data['failure_reason'])
                 ? (string) $data['failure_reason']
                 : null,
+            ($data['sandbox'] ?? false) === true,
         );
     }
 

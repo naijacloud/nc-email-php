@@ -40,6 +40,7 @@ final class CurlTransport implements Transport
     public function send(
         string $method,
         string $url,
+        #[\SensitiveParameter]
         array $headers,
         ?string $body,
         float $timeout,
@@ -140,7 +141,7 @@ final class CurlTransport implements Transport
      *
      * @return list<string>
      */
-    private static function formatHeaders(array $headers): array
+    private static function formatHeaders(#[\SensitiveParameter] array $headers): array
     {
         $formatted = [];
         foreach ($headers as $name => $value) {

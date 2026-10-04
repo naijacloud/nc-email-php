@@ -155,6 +155,51 @@ final class KeyRedactionTest extends TestCase
         self::assertContains('SensitiveParameter', $attributes);
     }
 
+    /**
+     * The transport receives the built headers, Authorization included. PHP
+     * records every argument of every frame in an exception's trace, which is
+     * what error trackers serialize, so that parameter must be marked too.
+     */
+    public function testTheTransportHeadersParameterIsMarkedSensitive(): void
+    {
+        foreach ([\NaijaCloud\Email\Http\Transport::class, CurlTransport::class] as $class) {
+            $parameter = (new \ReflectionMethod($class, 'send'))->getParameters()[2];
+            self::assertSame('headers', $parameter->getName());
+            $attributes = array_map(
+                static fn (\ReflectionAttribute $a): string => $a->getName(),
+                $parameter->getAttributes(),
+            );
+            self::assertContains('SensitiveParameter', $attributes, $class . '::send($headers)');
+        }
+    }
+
+    /** End to end: a connection failure's trace must not hold the key (PHP 8.2+). */
+    public function testAConnectionFailureTraceDoesNotCarryTheKey(): void
+    {
+        if (PHP_VERSION_ID < 80200) {
+            self::markTestSkipped('SensitiveParameter redaction needs PHP 8.2');
+        }
+        $client = new Naijamail(self::KEY, ['base_url' => 'http://127.0.0.1:9', 'max_retries' => 0]);
+        // PHP's own default: argument values are recorded in traces.
+        $previous = ini_set('zend.exception_ignore_args', '0');
+
+        try {
+            $client->emails->get('x');
+            self::fail('expected a connection failure');
+        } catch (NaijamailException $e) {
+            // A boolean, not assertStringNotContainsString: on failure that
+            // would print the whole trace, key and all, into the test log.
+            self::assertFalse(
+                str_contains(print_r($e->getTrace(), true), 'needle'),
+                'the exception trace holds the API key',
+            );
+        } finally {
+            if ($previous !== false) {
+                ini_set('zend.exception_ignore_args', $previous);
+            }
+        }
+    }
+
     public function testRedactionKeepsTheEnvironmentButNotTheSecret(): void
     {
         self::assertSame('nmail_live_***', (new Naijamail(self::KEY))->redactedApiKey());

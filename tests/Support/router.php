@@ -113,6 +113,12 @@ switch ($scenario) {
             'delivered_at' => null, 'opened' => false, 'clicked' => false]);
         break;
 
+    case 'sandbox-message':
+        $json(200, ['id' => $message['id'], 'to' => 'x@y.com', 'from' => 'hello@acme.com',
+            'subject' => 'Hi', 'status' => 'bounced', 'created_at' => '2026-08-29T10:00:00.000Z',
+            'delivered_at' => null, 'opened' => false, 'clicked' => false, 'sandbox' => true]);
+        break;
+
     case 'failed-message':
         $json(200, ['id' => $message['id'], 'to' => 'x@y.com', 'from' => 'hello@acme.com',
             'subject' => 'Hi', 'status' => 'bounced', 'created_at' => '2026-08-29T10:00:00.000Z',

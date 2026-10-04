@@ -323,14 +323,17 @@ final class SendRequest
             // kinder failure: a truncated tag silently splits one campaign's
             // analytics across two labels, and nobody reads the row that says
             // so until the numbers are already wrong.
-            if (mb_strlen($key) > Limits::MAX_TAG_KEY_CHARS) {
+            // Counted in UTF-16 units, the way the server's JavaScript
+            // `.length` counts them: an emoji is 2 there and 1 in mb_strlen,
+            // which let through tags the server then silently shortened.
+            if (self::utf16Length($key) > Limits::MAX_TAG_KEY_CHARS) {
                 throw new ValidationException(sprintf(
                     'tag key "%s" is longer than %d characters; the server would truncate it',
                     mb_substr($key, 0, 20) . '...',
                     Limits::MAX_TAG_KEY_CHARS,
                 ));
             }
-            if (mb_strlen($value) > Limits::MAX_TAG_VALUE_CHARS) {
+            if (self::utf16Length($value) > Limits::MAX_TAG_VALUE_CHARS) {
                 throw new ValidationException(sprintf(
                     'tag "%s" has a value longer than %d characters; the server would truncate it',
                     $key,
@@ -372,5 +375,13 @@ final class SendRequest
         }
 
         return $key;
+    }
+
+    /** Length as JavaScript's String.prototype.length reports it. */
+    private static function utf16Length(string $text): int
+    {
+        $utf16 = @mb_convert_encoding($text, 'UTF-16LE', 'UTF-8');
+
+        return is_string($utf16) ? intdiv(strlen($utf16), 2) : mb_strlen($text);
     }
 }

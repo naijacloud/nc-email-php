@@ -34,6 +34,10 @@ interface Transport
     public function send(
         string $method,
         string $url,
+        // Carries `Authorization`. Without this attribute every exception
+        // thrown from inside send() records the full key in its trace args,
+        // which is what Sentry and Monolog serialize (PHP 8.2+; ignored on 8.1).
+        #[\SensitiveParameter]
         array $headers,
         ?string $body,
         float $timeout,
