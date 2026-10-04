@@ -74,7 +74,23 @@ CI runs the suite on PHP 8.1, 8.2, 8.3 and 8.4. All four must pass.
    string. Change both.
 2. Move the `Unreleased` entries in `CHANGELOG.md` under the new version with a
    date.
-3. Tag `vX.Y.Z`. Packagist picks it up from the tag.
+3. Tag and push `vX.Y.Z`. Packagist picks it up from the tag.
+
+`.github/workflows/release.yml` runs the CI matrix, refuses a tag that disagrees
+with `composer.json` or `Naijamail::VERSION` (Packagist silently skips a tag
+whose name and `version` field disagree) or has no changelog section, and
+creates the GitHub release from the changelog section.
+
+### One-time setup
+
+- **packagist.org → Submit** with `https://github.com/naijacloud/nc-email-php`,
+  signed in with a Packagist account linked to a GitHub account that has admin
+  on the repository. Packagist then installs its GitHub hook, which is what
+  makes each tag show up within a minute.
+- Optional fallback if the hook is not installed: repository secrets
+  `PACKAGIST_USERNAME` and `PACKAGIST_TOKEN` (the API token on
+  packagist.org/profile). The release workflow then asks Packagist to re-read
+  the repository itself.
 
 `composer.lock` is deliberately not committed: this is a library, a consumer
 resolves against their own lock, and pinning here would only hide the fact that
