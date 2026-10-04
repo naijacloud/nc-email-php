@@ -222,6 +222,26 @@ final class SendValidationTest extends TestCase
         );
     }
 
+    /**
+     * The server truncates by JavaScript's `.length` (UTF-16 units). An emoji
+     * is 2 there and 1 in mb_strlen, so counting code points let through tags
+     * the server then silently shortened.
+     */
+    public function testTagLengthIsCountedTheWayTheServerCountsIt(): void
+    {
+        $this->assertRejectedLocally(
+            self::message(['tags' => [str_repeat("\u{1F600}", 33) => 'v']]),
+            'would truncate',
+        );
+        $this->assertRejectedLocally(
+            self::message(['tags' => ['k' => str_repeat("\u{1F600}", 129)]]),
+            'would truncate',
+        );
+
+        $this->client->emails->send(self::message(['tags' => [str_repeat('é', 60) => str_repeat('ọ', 250)]]));
+        self::assertCount(1, $this->transport->sends);
+    }
+
     public function testAPayloadOverTheSizeLimitIsRefusedBeforeSending(): void
     {
         // Just over 10 MiB once base64 has added its third.
