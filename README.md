@@ -61,6 +61,11 @@ PHP 8.1+ with `ext-curl`, `ext-json` and `ext-mbstring`. Nothing else: this
 package holds a live sending credential, and every third-party runtime
 dependency is one more supply chain that can reach it.
 
+PHP 8.2 or newer is recommended. The key is marked `#[\SensitiveParameter]`
+wherever it is passed, which keeps it out of exception stack traces (what Sentry
+and Monolog record); PHP 8.1 ignores that attribute, so on 8.1 set
+`zend.exception_ignore_args=On` in production.
+
 ## Sending
 
 ```php
