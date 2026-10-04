@@ -16,6 +16,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Redaction knows the new prefix, so a dump still shows which kind of credential
   a process is holding. `nc_pat_…` platform tokens remain refused: they predate
   the scope and the API rejects them on the mail routes.
+- `Email::$sandbox` on a retrieved email: true for a message sent with a test key,
+  which is recorded but never delivered, so a simulated bounce can be told from
+  a real one.
+
+### Fixed
+
+- The transport's `$headers` argument is marked `#[\SensitiveParameter]`, so the
+  API key no longer appears in the stack trace of a connection or timeout
+  exception (PHP 8.2+; on 8.1 PHP ignores the attribute).
+- Tag length is counted in UTF-16 units, the way the server counts it; emoji
+  tags the server would truncate are refused.
+- Test keys (`nmail_test_…`) are sandboxed by the API, not refused with a 403.
+  The README said otherwise.
 
 ## [0.1.0] - 2026-08-29
 
@@ -48,5 +61,5 @@ First release. Implements the Naijamail SDK contract for PHP 8.1+.
   non-serializable client, header-injection rejection, forbidden custom headers,
   and the client-side sending limits.
 
-[Unreleased]: https://github.com/naija-cloud/nc-email-php/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/naija-cloud/nc-email-php/releases/tag/v0.1.0
+[Unreleased]: https://github.com/naijacloud/nc-email-php/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/naijacloud/nc-email-php/releases/tag/v0.1.0
