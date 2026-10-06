@@ -56,7 +56,11 @@ final class Json
      */
     public static function decodeObject(string $raw): ?array
     {
-        if (trim($raw) === '') {
+        $trimmed = ltrim($raw);
+        // An object, not any JSON value: a list decodes to a PHP array too, and
+        // `[]` and `{}` both become `[]`, so the first character is the only
+        // reliable way to tell them apart.
+        if ($trimmed === '' || $trimmed[0] !== '{') {
             return null;
         }
 

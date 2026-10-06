@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace NaijaCloud\Email\Exception;
 
+use NaijaCloud\Email\Internal\Json;
 use RuntimeException;
 use Throwable;
 
@@ -53,8 +54,26 @@ class NaijamailException extends RuntimeException
         return $this->requestId;
     }
 
+    /** The raw response body, exactly as received. Same as {@see self::getRawBody()}. */
     public function getBody(): ?string
     {
         return $this->body;
+    }
+
+    /** The raw response body, exactly as received; null for a local error. */
+    public function getRawBody(): ?string
+    {
+        return $this->body;
+    }
+
+    /**
+     * The response body parsed as a JSON object, or null when there was no body
+     * or it was not a JSON object (proxy HTML, an empty 502).
+     *
+     * @return array<string,mixed>|null
+     */
+    public function getParsedBody(): ?array
+    {
+        return $this->body === null ? null : Json::decodeObject($this->body);
     }
 }

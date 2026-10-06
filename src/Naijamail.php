@@ -33,7 +33,7 @@ use SensitiveParameter;
  */
 final class Naijamail
 {
-    public const VERSION = '0.2.0';
+    public const VERSION = '0.3.0';
 
     public const DEFAULT_BASE_URL = 'https://api.naijacloud.com';
 
@@ -54,6 +54,10 @@ final class Naijamail
      * wrong-variable-name deploy, and a pattern that accepts anything catches
      * neither.
      */
+    public const PAT_MESSAGE = 'this is a personal access token (nc_pat_…), which cannot send mail;'
+        . ' use a mail API key (nmail_live_… or nmail_test_…) or a workspace API key with the'
+        . ' Email send scope (nc_live_…)';
+
     private const KEY_PATTERN = '/^(?:nmail_(?:live|test)|nc_live)_[A-Za-z0-9_-]{8,}$/';
 
     /**
@@ -223,6 +227,13 @@ final class Naijamail
 
         $key = trim($key);
 
+        // A pre-scopes platform token is the likeliest wrong credential a
+        // customer already holds, so it gets its own answer rather than the
+        // generic "not shaped like a key". Wording is fixed by the contract.
+        if (str_starts_with($key, 'nc_pat_')) {
+            throw new ValidationException(self::PAT_MESSAGE);
+        }
+
         // An obviously-wrong key is a local error now, rather than a 401 at
         // three in the morning from a deploy nobody has looked at since.
         // The message must never quote the value: an exception message ends up
@@ -325,7 +336,7 @@ final class Naijamail
     }
 
     /**
-     * `nc-email-php/0.2.0 (PHP/8.3.0)`, plus the caller's suffix.
+     * `nc-email-php/0.3.0 (PHP/8.3.0)`, plus the caller's suffix.
      *
      * The suffix is checked for header breaks like any other header value: it
      * usually comes from an application's own config, and a newline in it would

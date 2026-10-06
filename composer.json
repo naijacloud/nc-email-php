@@ -5,7 +5,7 @@
     "keywords": ["email", "transactional-email", "naijamail", "naija-cloud", "smtp", "api"],
     "homepage": "https://www.naijacloud.com",
     "license": "MIT",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "authors": [
         {
             "name": "Naija Cloud",

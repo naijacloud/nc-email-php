@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace NaijaCloud\Email;
 
 use NaijaCloud\Email\Exception\NaijamailException;
+use NaijaCloud\Email\Exception\ServerException;
 use NaijaCloud\Email\Exception\ValidationException;
 use NaijaCloud\Email\Internal\ApiClient;
 use NaijaCloud\Email\Internal\Guard;
@@ -60,14 +61,28 @@ final class Emails
     {
         $request = SendRequest::build($params);
 
+        $response = null;
         $body = $this->api->request(
             'POST',
             '/v1/emails',
             $request->encode(),
-            // The header, not the body field: the server reads the header first
-            // and it is the form every proxy and log in between understands.
+            // The header only, never the body field: the server reads the
+            // header first, and two copies could only disagree.
             ['Idempotency-Key' => $request->idempotencyKey],
+            $response,
         );
+
+        // A send that "succeeded" without an id is not a success the caller can
+        // do anything with — no get(), no support ticket. Raised, not retried.
+        if (!isset($body['id']) || !is_string($body['id']) || $body['id'] === '') {
+            throw new ServerException(
+                'malformed response: the send response has no "id"',
+                $response?->status ?? 0,
+                null,
+                $response?->header('x-request-id'),
+                $response?->body,
+            );
+        }
 
         return SendEmailResponse::fromArray($body);
     }

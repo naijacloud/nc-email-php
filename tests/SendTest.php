@@ -184,7 +184,7 @@ final class SendTest extends ServerTestCase
     public function testA2xxThatIsNotJsonIsAServerFaultNotAnEmptySuccess(): void
     {
         $this->expectException(\NaijaCloud\Email\Exception\ServerException::class);
-        $this->expectExceptionMessageMatches('/not JSON/');
+        $this->expectExceptionMessageMatches('/not a JSON object/');
 
         $this->client('ok-nonjson')->emails->send(self::validMessage());
     }

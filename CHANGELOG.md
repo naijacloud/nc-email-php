@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-07
+
+Conformance pass across the five Naijamail SDKs (TGL-741): behaviour that had
+drifted between languages is now the same everywhere, per the SDK contract.
+
+### Changed
+
+- **Message size is measured the way the server measures it**: UTF-8 bytes of
+  `html` + `text` plus the raw (decoded) attachment bytes, against 10 MiB.
+  Previously the whole base64 JSON body was measured, so attachments between
+  ~7.5 and 10 MiB were refused locally although the server accepts them.
+- An empty (or blank) `idempotency_key` now means "generate one", as if it were
+  omitted, instead of raising. The 255 limit is counted in bytes of UTF-8, not
+  characters (`Limits::MAX_IDEMPOTENCY_KEY_BYTES`; `MAX_IDEMPOTENCY_KEY_CHARS`
+  is kept as a deprecated alias).
+- An `nc_pat_…` key is refused with a specific message (it is a personal access
+  token; use `nmail_live_`/`nmail_test_` or an `nc_live_` key with the Email send
+  scope) instead of the generic "not shaped like a key".
+- `Webhooks::verify()` is stricter: `t=` must be 1–12 digits, a negative
+  tolerance raises `ValidationException`, and a verified payload that is a JSON
+  array or scalar (not an object) raises `WebhookVerificationException`.
+- A 2xx whose body is a JSON array rather than an object is a `ServerException`
+  ("malformed response"), like a non-JSON 2xx.
+
+### Added
+
+- `NaijamailException::getParsedBody()` (the error body parsed as a JSON object)
+  and `getRawBody()` (the raw text, same as `getBody()`), so every SDK exposes
+  both.
+
+### Fixed
+
+- A send response without an `id` raises `ServerException` ("malformed
+  response") instead of returning a `SendEmailResponse` with an empty id. Not
+  retried.
+- The class docblock of `Webhooks` no longer says the control plane does not
+  emit webhooks; it does.
+
 ## [0.2.0] - 2026-10-04
 
 The first version published to Packagist
@@ -67,5 +105,6 @@ First release. Implements the Naijamail SDK contract for PHP 8.1+.
   non-serializable client, header-injection rejection, forbidden custom headers,
   and the client-side sending limits.
 
-[Unreleased]: https://github.com/naijacloud/nc-email-php/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/naijacloud/nc-email-php/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/naijacloud/nc-email-php/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/naijacloud/nc-email-php/releases/tag/v0.2.0

@@ -91,7 +91,14 @@ $sent = $nm->emails->send([
 
 `to`, `cc`, `bcc` and `reply_to` each take a string or an array of strings.
 
-**Attachments take raw bytes.** The SDK base64-encodes them. It will never
+`idempotency_key` travels in the `Idempotency-Key` header only. An empty or
+blank key is treated as omitted (one is generated); a supplied key is at most
+255 bytes of UTF-8 and may not contain CR, LF or NUL.
+
+**Attachments take raw bytes.** A PHP string *is* the byte type, so `content`
+is always the raw file contents (`file_get_contents()`), never base64 — the SDK
+base64-encodes it once on the way out. An empty attachment is refused locally,
+as the server would refuse it. It will never
 accept a file path and read it for you — an SDK that opens whatever path it is
 handed becomes a file-disclosure bug the first time a request-supplied filename
 reaches it.
@@ -107,6 +114,13 @@ foreach ($sent->rejected as $recipient) {
     $log->info("not sent to {$recipient->address}: {$recipient->reason}");
 }
 ```
+
+### Retrieving a message
+
+`$nm->emails->get($id)` returns an `Email`. `createdAt` and `deliveredAt` are
+`?DateTimeImmutable` (parsed from the API's ISO 8601 strings; `deliveredAt` is
+null until delivery) — the other SDKs use their own language's date type, which
+is a deliberate difference.
 
 ### Statuses
 
@@ -152,11 +166,18 @@ Two kinds work, and the SDK cannot tell them apart once it has one:
 
 An `nc_pat_…` platform token is not accepted: those predate the Email send scope
 and the API refuses them on the mail routes, so the SDK refuses them at
-construction rather than a request later.
+construction rather than a request later, with a message saying it is a
+personal access token and which keys to use instead.
 
 The key comes from the first of: the constructor argument, `NAIJAMAIL_API_KEY`.
+Surrounding whitespace (a trailing newline from a secrets file) is trimmed.
 An absent or malformed key is an exception at construction, not a 401 an hour
 later in production.
+
+The base URL comes from the `base_url` option, else `NAIJAMAIL_BASE_URL`; a
+blank `NAIJAMAIL_BASE_URL` counts as unset. A base URL with a query string or
+fragment is refused. `timeout` must be greater than zero and `max_retries` an
+integer from 0 to 10.
 
 An unknown option is rejected rather than ignored: a silently dropped
 `'timout' => 5` is a client that waits 30 seconds in production and gives you no
@@ -177,16 +198,19 @@ process, which carry `statusCode === 0`.
 | 408 | `TimeoutException` | yes |
 | 409 | `ConflictException` | no |
 | 422 | `ValidationException` | no |
+| any other 4xx (405, 413, 415, 451…) | `ValidationException` | no |
 | 429 | `RateLimitException` (`getRetryAfter()`) | yes |
 | 3xx | `ServerException` ("unexpected redirect") | no |
 | 5xx | `ServerException` | yes |
+| 2xx that is not a JSON object, or a send response with no `id` | `ServerException` ("malformed response") | no |
 | DNS / TCP / TLS | `ConnectionException` | yes |
 | client-side deadline | `TimeoutException` | yes |
 | bad input, caught locally | `ValidationException` | no |
 
 Every one carries `statusCode`, `errorLabel` (the server's short label),
-`requestId` (from `x-request-id` — quote it in a support ticket) and the raw
-`body`.
+`requestId` (from `x-request-id` — quote it in a support ticket), the raw
+response text (`getRawBody()`, also `body`/`getBody()`) and the parsed JSON body
+(`getParsedBody()`, null when the body was not a JSON object).
 
 ```php
 use NaijaCloud\Email\Exception\{NaijamailException, PermissionException, RateLimitException};
@@ -215,8 +239,13 @@ other `4xx` — a 403 on an unverified domain will not verify itself between
 attempts, and retrying only burns your rate limit.
 
 Backoff is exponential with full jitter (`random(0, min(8s, 0.5s * 2^attempt))`).
-`Retry-After` overrides it, in either the integer-seconds or HTTP-date form,
-clamped to 60s so a mis-set header cannot park a worker for an hour.
+`Retry-After` overrides it on any retried response that carries it (a 429, a
+503 during a drain), in either the integer-seconds or HTTP-date form, clamped to
+60s so a mis-set header cannot park a worker for an hour.
+`RateLimitException::getRetryAfter()` is clamped the same way.
+
+The timeout is a deadline for the whole attempt — connect, upload and the full
+response — not a per-read timeout. Each retry gets a fresh one.
 
 This is safe because of the idempotency key: if you do not supply one, the SDK
 generates a UUIDv4 **once per `send()` call** and sends it on every attempt of
@@ -238,13 +267,16 @@ The rules this package is held to, all of them tested:
   client refuses to be serialized: a client in a session file or a queue payload
   is a credential in storage that outlives the process.
 - **Header injection is refused locally.** CR, LF and NUL are rejected in
-  `from`, every address, `subject`, custom header names and values, and
-  attachment filenames.
+  `from`, every address, `subject`, custom header names and values, the
+  idempotency key, and attachment filenames, content types and content ids.
 - **Custom `from`, `to`, `cc`, `bcc`, `subject`, `dkim-signature` and `received`
   headers are refused** — overriding them would sidestep the domain
-  authorisation your From address is checked against.
+  authorisation your From address is checked against. The check runs on the
+  trimmed name, so `" From"` is refused too.
 - **Client-side limits**, so an impossible message fails without a round trip:
-  50 recipients across to+cc+bcc, 10 MiB encoded, 25 custom headers, 10 tags.
+  50 recipients across to+cc+bcc, 10 MiB of message (html + text + raw
+  attachment bytes, measured the way the server measures it — not the base64
+  JSON), 25 custom headers, 10 tags.
 - **No global state.** Two clients with two keys in one process cannot interfere.
 
 Found a problem? See [SECURITY.md](SECURITY.md). Do not open a public issue.
@@ -333,7 +365,11 @@ changes spacing, and the signature is over the bytes that were actually sent.
 
 Verification rejects a bad signature, and also a timestamp more than 300 seconds
 from now — a captured delivery carries a signature that is genuinely ours and
-would otherwise verify forever.
+would otherwise verify forever. Pass a different `$tolerance` as the fourth
+argument; `0` is strict (only the current second passes), and a negative value
+is a `ValidationException`. The `t=` value must be 1–12 digits; the hex
+signature is compared case-insensitively; and a verified payload that is not a
+JSON object (an array, a string) is rejected.
 
 ## Contributing
 
