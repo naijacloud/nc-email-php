@@ -45,13 +45,21 @@ final class ApiClient
 
     /**
      * @param array<string,string> $extraHeaders
+     * @param HttpResponse|null    $response     Set to the final 2xx response, for a caller
+     *                                           that needs the raw body to report a
+     *                                           malformed answer.
      *
      * @return array<string,mixed> The decoded response body.
      *
      * @throws NaijamailException
      */
-    public function request(string $method, string $path, ?string $json = null, array $extraHeaders = []): array
-    {
+    public function request(
+        string $method,
+        string $path,
+        ?string $json = null,
+        array $extraHeaders = [],
+        ?HttpResponse &$response = null,
+    ): array {
         $url = $this->baseUrl . $path;
         // Union, not array_merge: on a key collision the left side wins, so a
         // caller-supplied header can never displace Authorization or the
@@ -186,7 +194,8 @@ final class ApiClient
             // the API's place. Treat it as a server fault rather than handing
             // the caller an empty object that looks like a successful send.
             throw new ServerException(
-                'the API returned a ' . $response->status . ' with a body that is not JSON.'
+                'malformed response: the API returned a ' . $response->status
+                . ' with a body that is not a JSON object.'
                 . ' Something between this process and the API is answering for it.',
                 $response->status,
                 null,

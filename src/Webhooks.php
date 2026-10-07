@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace NaijaCloud\Email;
 
+use NaijaCloud\Email\Exception\ValidationException;
 use NaijaCloud\Email\Exception\WebhookVerificationException;
 use NaijaCloud\Email\Internal\Json;
 use NaijaCloud\Email\Model\WebhookEvent;
@@ -16,10 +17,9 @@ use SensitiveParameter;
  * payload is `"<t>.<raw body bytes>"` and the secret is the endpoint's
  * `nmail_whsec_...`.
  *
- * **Not yet emitted by the control plane.** The scheme is fixed here so both
- * sides ship against the same definition, and so an application can be written
- * against it today; nothing sends these headers yet. Do not advertise webhook
- * support to your own users on the strength of this class alone.
+ * The control plane signs every event webhook delivery this way. During a
+ * secret rotation the header carries two `v1=` values for 24 hours; either
+ * matching is enough.
  */
 final class Webhooks
 {
@@ -43,11 +43,14 @@ final class Webhooks
      *                          were actually sent.
      * @param string $header    The `NC-Signature` header value.
      * @param string $secret    The endpoint signing secret.
-     * @param int    $tolerance Replay window in seconds.
+     * @param int    $tolerance Replay window in seconds. 0 is strict (only the
+     *                          current second passes), never "the default";
+     *                          a negative value is a ValidationException.
      * @param int|null $now     Overridable for tests only.
      *
      * @throws WebhookVerificationException Bad signature, stale timestamp, or a body
-     *         that verified but is not JSON.
+     *         that verified but is not a JSON object.
+     * @throws ValidationException           A negative tolerance.
      */
     public static function verify(
         string $payload,
@@ -59,6 +62,9 @@ final class Webhooks
     ): WebhookEvent {
         if (trim($secret) === '') {
             throw new WebhookVerificationException('a webhook signing secret is required');
+        }
+        if ($tolerance < 0) {
+            throw new ValidationException('tolerance must be 0 or more seconds');
         }
 
         [$timestamp, $signatures] = self::parseHeader($header);
@@ -124,7 +130,9 @@ final class Webhooks
 
             [$name, $value] = [trim($pair[0]), trim($pair[1])];
 
-            if ($name === 't' && preg_match('/^\d+$/', $value) === 1) {
+            // 1–12 ASCII digits and nothing else: no sign, no exponent, and
+            // short enough that it can never overflow an integer.
+            if ($name === 't' && preg_match('/^[0-9]{1,12}$/D', $value) === 1) {
                 $timestamp = (int) $value;
             } elseif ($name === 'v1' && preg_match('/^[0-9a-f]{64}$/i', $value) === 1) {
                 // Lowercased so a sender that hex-encodes in upper case still

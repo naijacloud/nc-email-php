@@ -123,7 +123,8 @@ final class SendRequest
             $body['headers'] = $headers;
         }
 
-        $attachments = self::attachments($params['attachments'] ?? null);
+        $rawAttachmentBytes = 0;
+        $attachments = self::attachments($params['attachments'] ?? null, $rawAttachmentBytes);
         if ($attachments !== []) {
             $body['attachments'] = $attachments;
         }
@@ -144,28 +145,30 @@ final class SendRequest
             throw new ValidationException('a message needs "html", "text" or an attachment');
         }
 
-        return new self($body, self::idempotencyKey($params['idempotency_key'] ?? null));
-    }
-
-    /**
-     * The encoded body, with the size limit applied to what actually goes on
-     * the wire rather than to the raw bytes the caller handed us — base64 is a
-     * third larger, and it is the encoded size the server measures.
-     */
-    public function encode(): string
-    {
-        $json = Json::encode($this->body);
-
-        if (strlen($json) > Limits::MAX_BYTES) {
+        // Measured exactly as the server measures it: html and text as UTF-8
+        // bytes plus the *decoded* attachment bytes. Not the encoded JSON —
+        // base64 inflates attachments by a third, and measuring that refused
+        // 7.5–10 MiB attachments the server would have taken.
+        $size = strlen($html ?? '') + strlen($text ?? '') + $rawAttachmentBytes;
+        if ($size > Limits::MAX_BYTES) {
             throw new ValidationException(sprintf(
-                'the message is %.1f MiB encoded, over the %d MiB limit. Attachments are base64 on'
-                . ' the wire, so they cost about a third more than their raw size.',
-                strlen($json) / 1048576,
+                'the message is %d bytes (html + text + attachments), over the %d-byte (%d MiB) limit',
+                $size,
+                Limits::MAX_BYTES,
                 (int) (Limits::MAX_BYTES / 1048576),
             ));
         }
 
-        return $json;
+        return new self($body, self::idempotencyKey($params['idempotency_key'] ?? null));
+    }
+
+    /**
+     * The encoded body. The size limit is applied in {@see self::build()}, to
+     * the raw bytes, because that is what the server counts.
+     */
+    public function encode(): string
+    {
+        return Json::encode($this->body);
     }
 
     /**
@@ -223,7 +226,7 @@ final class SendRequest
     /**
      * @return list<array<string,string>>
      */
-    private static function attachments(mixed $raw): array
+    private static function attachments(mixed $raw, int &$rawBytes = 0): array
     {
         if ($raw === null) {
             return [];
@@ -265,6 +268,8 @@ final class SendRequest
             if ($attachment['content'] === '') {
                 throw new ValidationException($label . ' content is empty');
             }
+
+            $rawBytes += strlen($attachment['content']);
 
             $entry = [
                 'filename' => $filename,
@@ -356,21 +361,30 @@ final class SendRequest
      */
     private static function idempotencyKey(mixed $supplied): string
     {
-        if ($supplied === null) {
+        // An empty key counts as "none supplied", in every SDK: it is what an
+        // unset config value or an empty form field produces, and refusing it
+        // would turn a harmless default into a failed send.
+        if ($supplied === null || $supplied === '') {
             return Uuid::v4();
         }
 
-        if (!is_string($supplied) || trim($supplied) === '') {
-            throw new ValidationException('idempotency_key must be a non-empty string');
+        if (!is_string($supplied)) {
+            throw new ValidationException('idempotency_key must be a string');
         }
 
         $key = trim($supplied);
+        if ($key === '') {
+            return Uuid::v4();
+        }
         Guard::noHeaderBreaks($key, 'idempotency_key');
 
-        if (strlen($key) > Limits::MAX_IDEMPOTENCY_KEY_CHARS) {
+        // Bytes, not characters: the server stores and compares the bytes, and
+        // every SDK counts the same way.
+        if (strlen($key) > Limits::MAX_IDEMPOTENCY_KEY_BYTES) {
             throw new ValidationException(sprintf(
-                'idempotency_key is longer than %d characters',
-                Limits::MAX_IDEMPOTENCY_KEY_CHARS,
+                'idempotency_key is %d bytes of UTF-8, over the %d-byte limit',
+                strlen($key),
+                Limits::MAX_IDEMPOTENCY_KEY_BYTES,
             ));
         }
 

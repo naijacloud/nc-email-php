@@ -244,13 +244,57 @@ final class SendValidationTest extends TestCase
 
     public function testAPayloadOverTheSizeLimitIsRefusedBeforeSending(): void
     {
-        // Just over 10 MiB once base64 has added its third.
+        // html + raw attachment bytes one over 10 MiB, as the server counts.
+        $html = '<p>Thanks.</p>';
         $this->assertRejectedLocally(
             self::message([
+                'html' => $html,
                 'attachments' => [[
                     'filename' => 'huge.bin',
-                    'content' => str_repeat('A', 8 * 1024 * 1024),
+                    'content' => str_repeat('A', Limits::MAX_BYTES - strlen($html) + 1),
                 ]],
+            ]),
+            'over the',
+        );
+    }
+
+    /**
+     * TGL-741: the server counts decoded attachment bytes, so a 9 MiB attachment
+     * (12 MiB once base64-encoded) is sendable and must not be refused locally.
+     */
+    public function testAnAttachmentUnderTheLimitRawButOverItEncodedIsSent(): void
+    {
+        $this->client->emails->send(self::message([
+            'attachments' => [['filename' => 'big.bin', 'content' => str_repeat('A', 9 * 1024 * 1024)]],
+        ]));
+
+        self::assertCount(1, $this->transport->sends);
+        self::assertGreaterThan(Limits::MAX_BYTES, strlen((string) $this->transport->sends[0]['body']));
+    }
+
+    /** Exactly the limit is allowed; html and text both count as UTF-8 bytes. */
+    public function testAMessageOfExactlyTheLimitIsSent(): void
+    {
+        $text = str_repeat('é', 1024); // 2048 bytes of UTF-8
+        $html = '<p>x</p>';
+        $this->client->emails->send(self::message([
+            'html' => $html,
+            'text' => $text,
+            'attachments' => [[
+                'filename' => 'fit.bin',
+                'content' => str_repeat('A', Limits::MAX_BYTES - strlen($html) - strlen($text)),
+            ]],
+        ]));
+
+        self::assertCount(1, $this->transport->sends);
+    }
+
+    public function testTextIsMeasuredInUtf8BytesNotCharacters(): void
+    {
+        $this->assertRejectedLocally(
+            self::message([
+                'html' => null,
+                'text' => str_repeat('é', (int) (Limits::MAX_BYTES / 2) + 1),
             ]),
             'over the',
         );

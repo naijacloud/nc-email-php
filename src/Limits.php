@@ -20,7 +20,10 @@ final class Limits
     /** Across to + cc + bcc, per message. */
     public const MAX_RECIPIENTS = 50;
 
-    /** Total encoded request body. Attachments are base64, so ~4/3 of raw bytes. */
+    /**
+     * Message size: UTF-8 bytes of html + text plus the raw (decoded) bytes of
+     * every attachment — what the server counts. Equal to the limit is allowed.
+     */
     public const MAX_BYTES = 10 * 1024 * 1024;
 
     /** An unbounded header map is a way to inflate a message past a naive size check. */
@@ -30,8 +33,11 @@ final class Limits
     public const MAX_TAG_KEY_CHARS = 64;
     public const MAX_TAG_VALUE_CHARS = 256;
 
-    /** The server's column width for an idempotency key. */
-    public const MAX_IDEMPOTENCY_KEY_CHARS = 255;
+    /** Longest idempotency key, counted in bytes of UTF-8. */
+    public const MAX_IDEMPOTENCY_KEY_BYTES = 255;
+
+    /** @deprecated 0.3.0 The limit is in bytes; use MAX_IDEMPOTENCY_KEY_BYTES. */
+    public const MAX_IDEMPOTENCY_KEY_CHARS = self::MAX_IDEMPOTENCY_KEY_BYTES;
 
     private function __construct()
     {
