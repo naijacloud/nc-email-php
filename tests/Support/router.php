@@ -103,6 +103,10 @@ switch ($scenario) {
         $json(200, $message + ['delivery_attempts' => 2]);
         break;
 
+    case 'sandbox':
+        $accepted(['sandbox' => true]);
+        break;
+
     case 'rejected':
         $accepted(['rejected' => [['address' => 'blocked@example.com', 'reason' => 'suppressed']]]);
         break;

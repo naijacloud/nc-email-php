@@ -21,6 +21,18 @@ final class SendTest extends ServerTestCase
         self::assertSame('5b1e0000-0000-4000-8000-000000000001', $sent->id);
         self::assertSame(MessageStatus::QUEUED, $sent->status);
         self::assertSame([], $sent->rejected);
+        self::assertFalse($sent->sandbox);
+    }
+
+    /**
+     * A test-key send answers `"sandbox": true`; the caller must not need a
+     * second get() to learn nothing will be delivered.
+     */
+    public function testTheSandboxFlagOfATestKeySendIsExposed(): void
+    {
+        $sent = $this->client('sandbox')->emails->send(self::validMessage());
+
+        self::assertTrue($sent->sandbox);
     }
 
     /**

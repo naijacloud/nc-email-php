@@ -14,7 +14,11 @@ use NaijaCloud\Email\Model\Email;
 use NaijaCloud\Email\Model\SendEmailResponse;
 
 /**
- * The `emails` resource: the two endpoints the API has.
+ * The `emails` resource: send one message and read one back.
+ *
+ * The API has more routes (batch send, list, limits, domains and suppressions;
+ * see https://naijacloud.com/docs/api/email). They are REST-only for now; this
+ * SDK wraps the two every integration needs.
  *
  * Reached as `$nm->emails`, never constructed directly.
  */
@@ -53,6 +57,8 @@ final class Emails
      *
      * @param array<string,mixed> $params from, to, cc, bcc, reply_to, subject, html,
      *                                    text, headers, attachments, tags, idempotency_key.
+     *                                    `subject` is required by the API, and so is at
+     *                                    least one of `html` and `text`.
      *
      * @throws ValidationException The message is not sendable as written, or the API refused it.
      * @throws NaijamailException  Everything else: auth, permission, rate limit, network.
