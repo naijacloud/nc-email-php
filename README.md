@@ -27,7 +27,11 @@
 The official PHP SDK for **Naijamail**, the transactional email API of
 [Naija Cloud](https://www.naijacloud.com).
 
-Two endpoints, no runtime dependencies, and a webhook verifier.
+Send and retrieve, no runtime dependencies, and a verifier for the signed
+webhooks Naija Cloud delivers. The API's other routes (batch send, list, limits,
+domains, suppressions) are documented at
+[naijacloud.com/docs/api/email](https://naijacloud.com/docs/api/email) and are
+not wrapped yet.
 
 ```bash
 composer require naijacloud/email
@@ -75,8 +79,8 @@ $sent = $nm->emails->send([
     'cc' => 'finance@acme.com',
     'bcc' => 'archive@acme.com',
     'reply_to' => 'support@acme.com',
-    'subject' => 'Invoice #1024',
-    'html' => '<p>Attached.</p>',
+    'subject' => 'Invoice #1024',              // required
+    'html' => '<p>Attached.</p>',             // html, text or both: at least one is required
     'text' => 'Attached.',
     'headers' => ['X-Campaign' => 'invoices'],
     'attachments' => [[
@@ -89,7 +93,14 @@ $sent = $nm->emails->send([
 ]);
 ```
 
+`subject` is required: the API refuses a missing or blank one with a 400
+`subject is required`. At least one of `html` and `text` is required too (400
+`provide html, text, or both`).
+
 `to`, `cc`, `bcc` and `reply_to` each take a string or an array of strings.
+
+`$sent->sandbox` is `true` when the send used a test key: the message is
+recorded and gets a final status, and is never handed to a mail server.
 
 `idempotency_key` travels in the `Idempotency-Key` header only. An empty or
 blank key is treated as omitted (one is generated); a supplied key is at most
@@ -161,7 +172,8 @@ Two kinds work, and the SDK cannot tell them apart once it has one:
   staging and CI. Send from any domain you have added, or from
   `…@test.mail.naijacloud.dev`; send *to* `delivered@`, `bounced@` or
   `complained@test.mail.naijacloud.dev` to get that outcome. A message sent
-  this way comes back from `get` with `sandbox` set to true. There is no test
+  this way has `sandbox` set to true in the send response and when you `get`
+  it back. There is no test
   variant of a workspace key.
 
 An `nc_pat_…` platform token is not accepted: those predate the Email send scope

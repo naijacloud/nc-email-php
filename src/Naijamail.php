@@ -33,7 +33,7 @@ use SensitiveParameter;
  */
 final class Naijamail
 {
-    public const VERSION = '0.3.0';
+    public const VERSION = '0.3.1';
 
     public const DEFAULT_BASE_URL = 'https://api.naijacloud.com';
 
@@ -336,7 +336,7 @@ final class Naijamail
     }
 
     /**
-     * `nc-email-php/0.3.0 (PHP/8.3.0)`, plus the caller's suffix.
+     * `nc-email-php/0.3.1 (PHP/8.3.0)`, plus the caller's suffix.
      *
      * The suffix is checked for header breaks like any other header value: it
      * usually comes from an application's own config, and a newline in it would

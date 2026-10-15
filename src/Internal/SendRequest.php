@@ -100,9 +100,9 @@ final class SendRequest
             $body['reply_to'] = $replyTo;
         }
 
-        // Always sent, even empty: the server defaults a missing subject to ""
-        // anyway, and sending it explicitly keeps the request identical to what
-        // the caller asked for.
+        // Always sent, even empty, so the request is what the caller asked for.
+        // The API requires a non-blank subject and answers a missing one with a
+        // 400 "subject is required".
         $body['subject'] = Guard::noHeaderBreaks(
             Guard::optionalString($params['subject'] ?? null, 'subject') ?? '',
             'subject',

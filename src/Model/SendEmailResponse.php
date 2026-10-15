@@ -20,11 +20,17 @@ final class SendEmailResponse
      * @param string                 $status   A {@see \NaijaCloud\Email\MessageStatus} constant,
      *                                         or a newer value this release has never seen.
      * @param list<RejectedRecipient> $rejected Always present, empty when nobody was refused.
+     * @param bool                   $sandbox  True when the send used a test key (`nmail_test_…`):
+     *                                         accepted and recorded, never handed to a mail
+     *                                         server. The same flag {@see Email::$sandbox}
+     *                                         carries, so a test send is recognisable without a
+     *                                         second request.
      */
     public function __construct(
         public readonly string $id,
         public readonly string $status,
         public readonly array $rejected = [],
+        public readonly bool $sandbox = false,
     ) {
     }
 
@@ -54,6 +60,7 @@ final class SendEmailResponse
             isset($data['id']) && is_scalar($data['id']) ? (string) $data['id'] : '',
             isset($data['status']) && is_scalar($data['status']) ? (string) $data['status'] : '',
             $rejected,
+            ($data['sandbox'] ?? false) === true,
         );
     }
 }

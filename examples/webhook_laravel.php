@@ -6,9 +6,8 @@ declare(strict_types=1);
  * Receiving a Naijamail webhook in Laravel.
  *
  * NOT RUNNABLE AS A SCRIPT — this is the controller and route to copy into an
- * application, and the control plane does not emit these webhooks yet. The
- * signature scheme is fixed ahead of the server so both sides ship against one
- * definition; nothing sends NC-Signature today.
+ * application. Naija Cloud signs every event it delivers to an endpoint you
+ * register with the NC-Signature header verified here.
  */
 
 use Illuminate\Http\Request;
